@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"req-forge-server/internal/handler"
+	"req-forge-server/internal/middleware"
 	"req-forge-server/internal/store"
 
 	"github.com/gin-gonic/gin"
@@ -31,13 +32,21 @@ func main() {
 
 	h := handler.NewDecompositionHandler(db)
 
+	// 公开路由:登录签发 JWT
+	r.POST("/api/login", handler.Login)
+
+	// 受保护路由:需要 Authorization: Bearer <token>
 	api := r.Group("/api")
+	api.Use(middleware.Auth())
 	{
-		api.GET("/decompositions", h.List)          // 列表(最近 50 条)
-		api.POST("/decompositions", h.Create)       // 保存一次拆解
-		api.GET("/decompositions/:id", h.Get)       // 详情
-		api.DELETE("/decompositions/:id", h.Delete) // 删除
+		api.GET("/decompositions", h.List)
+		api.POST("/decompositions", h.Create)
+		api.GET("/decompositions/:id", h.Get)
+		api.DELETE("/decompositions/:id", h.Delete)
 	}
+
+	// WebSocket 长连接(心跳 + echo)
+	r.GET("/ws", handler.WS)
 
 	log.Println("req-forge-server 监听 :8080")
 	if err := r.Run(":8080"); err != nil {
